@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>RIMA – 3 Button LIFF</title>
+  <link rel="preconnect" href="https://static.line-scdn.net">
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;padding:20px;max-width:720px;margin:0 auto}
+    .btn{display:block;width:100%;padding:14px 16px;margin:10px 0;border:1px solid #ddd;border-radius:12px;background:#fff;cursor:pointer;font-size:16px}
+    label{display:block;margin-top:10px}
+    input,select{width:100%;padding:10px;border:1px solid #ddd;border-radius:10px}
+    pre{background:#f7f7f7;border:1px solid #eee;padding:12px;border-radius:10px;white-space:pre-wrap}
+  </style>
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+</head>
+<body>
+  <h2>RIMA Core</h2>
+  <p>3-button flow powered by Google Sheets + Apps Script.</p>
+
+  <!-- ① Apply / Post -->
+  <button class="btn" onclick="toggleForm()">① Apply / Post</button>
+  <div id="form" style="display:none">
+    <label>Domain
+      <select id="domain">
+        <option>wingz.capital</option>
+        <option>landsmilecrm</option>
+        <option>introhub.me</option>
+      </select>
+    </label>
+    <label>Request Type
+      <select id="request_type">
+        <option>loan</option>
+        <option>land_service</option>
+        <option>intro</option>
+      </select>
+    </label>
+    <label>Your Name <input id="name" placeholder="Your name"/></label>
+    <label>Region <input id="region" placeholder="Phuket"/></label>
+    <label>Loan Amount (optional) <input id="loan_amount" type="number" placeholder="3000000"/></label>
+    <label>Loan Type (optional) <input id="loan_type" placeholder="working_capital"/></label>
+    <label>Land Action (optional) <input id="land_action" placeholder="fill / level / water_delivery"/></label>
+    <label>Industry (optional) <input id="industry" placeholder="mining, hospitality, ..."/></label>
+    <label>Notes <input id="notes" placeholder="anything else"/></label>
+    <button class="btn" onclick="apply()">Submit</button>
+  </div>
+
+  <!-- ② Check Matches -->
+  <button class="btn" onclick="check()">② Check Matches (by request_id)</button>
+
+  <!-- ③ Track My Items -->
+  <button class="btn" onclick="track()">③ Track My Items</button>
+
+  <pre id="out">Loading LIFF…</pre>
+
+<script>
+const WEB_APP = 'https://script.google.com/macros/s/AKfycbyaS0c1iR5WpbT3AzEajVVaueXU48awkkAQUHpQp60fPpp80UcjXUBOPyeal3hW6e8G/exec'; // e.g. https://script.google.com/macros/s/AKfycb.../exec
+let userId = '';
+
+function log(x){ document.getElementById('out').textContent = typeof x==='string' ? x : JSON.stringify(x,null,2); }
+function val(id){ return document.getElementById(id).value.trim(); }
+function toggleForm(){
+  const f = document.getElementById('form');
+  f.style.display = f.style.display==='none' ? 'block' : 'none';
+}
+
+async function liffInit(){
+  try{
+    await liff.init({ liffId: '2008221270-rY6odLMG' });
+    if (!liff.isLoggedIn()) liff.login();
+    const prof = await liff.getProfile();
+    userId = prof.userId;
+    log({ ok:true, message:'LIFF ready', userId });
+  }catch(e){ log({ ok:false, error:String(e) }); }
+}
+
+async function apply(){
+  const payload = {
+    domain: val('domain'),
+    request_type: val('request_type'),
+    requester_name: val('name') || 'LIFF User',
+    requester_line_user_id: userId,
+    requester_contact: 'liff',
+    region: val('region'),
+    loan_amount: Number(val('loan_amount')||0) || '',
+    loan_type: val('loan_type'),
+    land_action: val('land_action'),
+    industry: val('industry'),
+    notes: val('notes')
+  };
+  const res = await fetch(WEB_APP, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ action:'submitRequest', payload })
+  });
+  log(await res.json());
+}
+
+async function check(){
+  const id = prompt('Enter request_id (e.g., REQ-0001):');
+  if (!id) return;
+  const res = await fetch(WEB_APP, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ action:'findMatches', payload:{ request_id:id } })
+  });
+  log(await res.json());
+}
+
+async function track(){
+  const res = await fetch(WEB_APP, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ action:'getMyItems', payload:{ userId } })
+  });
+  log(await res.json());
+}
+
+liffInit();
+</script>
+</body>
+</html>
