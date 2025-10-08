@@ -1,26 +1,49 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>RIMA – 3 Button LIFF</title>
-  <link rel="preconnect" href="https://static.line-scdn.net">
-  <style>
-    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;padding:20px;max-width:720px;margin:0 auto}
-    .btn{display:block;width:100%;padding:14px 16px;margin:10px 0;border:1px solid #ddd;border-radius:12px;background:#fff;cursor:pointer;font-size:16px}
-    label{display:block;margin-top:10px}
-    input,select{width:100%;padding:10px;border:1px solid #ddd;border-radius:10px}
-    pre{background:#f7f7f7;border:1px solid #eee;padding:12px;border-radius:10px;white-space:pre-wrap}
-  </style>
-  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>RIMA – LIFF Debug</title>
+<link rel="preconnect" href="https://static.line-scdn.net">
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<style>
+  :root{--bg:#0b1220;--fg:#cfe6ff;--muted:#8fb8ff;}
+  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;padding:16px;max-width:920px;margin:0 auto}
+  h2{margin:8px 0 6px}
+  .btn{display:block;width:100%;padding:12px 14px;margin:10px 0;border:1px solid #ddd;border-radius:12px;background:#fff;cursor:pointer;font-size:16px}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  label{display:block;font-size:14px}
+  input,select{width:100%;padding:10px;border:1px solid #ddd;border-radius:10px}
+  #log{white-space:pre-wrap;background:var(--bg);color:var(--fg);border-radius:10px;padding:12px;min-height:180px}
+  code{background:#f6f6f6;border:1px solid #eee;padding:2px 6px;border-radius:6px}
+  .small{font-size:12px;color:#333}
+  a{color:#0b57d0;text-decoration:none}
+</style>
 </head>
 <body>
-  <h2>RIMA Core</h2>
-  <p>3-button flow powered by Google Sheets + Apps Script.</p>
+  <h2>RIMA – LIFF Debugger</h2>
+  <p class="small">
+    Docs: <a href="https://developers.line.biz/en/docs/liff/" target="_blank" rel="noopener">https://developers.line.biz/en/docs/liff/</a> ·
+    Apps Script Web Apps: <a href="https://developers.google.com/apps-script/guides/web" target="_blank" rel="noopener">https://developers.google.com/apps-script/guides/web</a>
+  </p>
 
-  <!-- ① Apply / Post -->
-  <button class="btn" onclick="toggleForm()">① Apply / Post</button>
-  <div id="form" style="display:none">
+  <div class="small">
+    <div>LIFF ID: <code id="liffId">YOUR_LIFF_ID</code></div>
+    <div>WEB_APP: <code id="webApp">YOUR_WEB_APP_URL</code></div>
+  </div>
+
+  <div class="row">
+    <button class="btn" id="btnInit">Init LIFF</button>
+    <button class="btn" id="btnProfile">Get Profile</button>
+  </div>
+  <div class="row">
+    <button class="btn" id="btnPing">Ping Backend (GET /exec)</button>
+    <button class="btn" id="btnSubmit">Submit Demo (POST submitRequest)</button>
+  </div>
+  <button class="btn" id="btnTrack">Track My Items</button>
+
+  <h3>Request payload</h3>
+  <div class="row">
     <label>Domain
       <select id="domain">
         <option>wingz.capital</option>
@@ -29,95 +52,157 @@
       </select>
     </label>
     <label>Request Type
-      <select id="request_type">
+      <select id="rtype">
         <option>loan</option>
         <option>land_service</option>
         <option>intro</option>
       </select>
     </label>
-    <label>Your Name <input id="name" placeholder="Your name"/></label>
-    <label>Region <input id="region" placeholder="Phuket"/></label>
-    <label>Loan Amount (optional) <input id="loan_amount" type="number" placeholder="3000000"/></label>
-    <label>Loan Type (optional) <input id="loan_type" placeholder="working_capital"/></label>
-    <label>Land Action (optional) <input id="land_action" placeholder="fill / level / water_delivery"/></label>
-    <label>Industry (optional) <input id="industry" placeholder="mining, hospitality, ..."/></label>
-    <label>Notes <input id="notes" placeholder="anything else"/></label>
-    <button class="btn" onclick="apply()">Submit</button>
   </div>
+  <div class="row">
+    <label>Name <input id="name" placeholder="LIFF User"/></label>
+    <label>Region <input id="region" placeholder="Phuket"/></label>
+  </div>
+  <div class="row">
+    <label>Loan Amount <input id="amt" type="number" placeholder="3000000"/></label>
+    <label>Loan Type <input id="ltype" placeholder="working_capital"/></label>
+  </div>
+  <div class="row">
+    <label>Land Action <input id="laction" placeholder="fill / level / water_delivery"/></label>
+    <label>Industry <input id="industry" placeholder="mining / hospitality"/></label>
+  </div>
+  <label>Notes <input id="notes" placeholder="anything else"/></label>
 
-  <!-- ② Check Matches -->
-  <button class="btn" onclick="check()">② Check Matches (by request_id)</button>
-
-  <!-- ③ Track My Items -->
-  <button class="btn" onclick="track()">③ Track My Items</button>
-
-  <pre id="out">Loading LIFF…</pre>
+  <h3>Log</h3>
+  <pre id="log">ready…</pre>
 
 <script>
-///const WEB_APP = 'https://script.google.com/macros/s/AKfycbw_IGeNnM6PdpVAUfVgd11WuwEw4J4FK2Lxr7W7zRiEXT_UWRiQNlgt7pcyJLVvfwDV/exec'; // e.g. https://script.google.com/macros/s/AKfycb.../exec  
+/** --------------------------
+ *  Replace these placeholders
+ * -------------------------- */
+///const WEB_APP = 'YOUR_WEB_APP_URL';    // e.g. https://script.google.com/macros/s/AKfycb.../exec
+const LIFF_ID = '2008221270-rY6odLMG';        // from LINE Developers
 const WEB_APP = 'https://script.google.com/macros/s/AKfycbw_IGeNnM6PdpVAUfVgd11WuwEw4J4FK2Lxr7W7zRiEXT_UWRiQNlgt7pcyJLVvfwDV/exec';
+///let userId = '';
+
+/** State */
 let userId = '';
+let inited = false;
 
-function log(x){ document.getElementById('out').textContent = typeof x==='string' ? x : JSON.stringify(x,null,2); }
-function val(id){ return document.getElementById(id).value.trim(); }
-function toggleForm(){
-  const f = document.getElementById('form');
-  f.style.display = f.style.display==='none' ? 'block' : 'none';
+/** Utilities */
+function out(){
+  const el = document.getElementById('log');
+  const msg = Array.from(arguments).map(a => typeof a==='string' ? a : JSON.stringify(a, null, 2)).join(' ');
+  el.textContent += '\n' + msg;
+  console.log.apply(console, arguments);
 }
+function v(id){ return document.getElementById(id).value.trim(); }
 
-async function liffInit(){
+/** Global error traps */
+window.onerror = (m, src, line, col, err) => out('window.onerror:', m, src+':'+line+':'+col, err && err.stack ? err.stack : '');
+window.onunhandledrejection = (e) => out('unhandledrejection:', e && (e.reason || e));
+
+/** Show placeholders */
+document.getElementById('liffId').textContent = LIFF_ID;
+document.getElementById('webApp').textContent = WEB_APP;
+
+/** LIFF init + profile */
+async function initLiff(){
   try{
-    await liff.init({ liffId: '2008221270-rY6odLMG' });
-    if (!liff.isLoggedIn()) liff.login();
+    out('initLiff: starting with', LIFF_ID);
+    await liff.init({ liffId: LIFF_ID });
+    inited = true;
+    out('LIFF: isInClient=', liff.isInClient(), 'isLoggedIn=', liff.isLoggedIn());
+    if (!liff.isLoggedIn()){
+      out('LIFF: not logged in → calling liff.login()');
+      liff.login(); // Will reload inside LINE
+      return;
+    }
     const prof = await liff.getProfile();
-    userId = prof.userId;
-    log({ ok:true, message:'LIFF ready', userId });
-  }catch(e){ log({ ok:false, error:String(e) }); }
+    userId = prof.userId || userId || 'DEBUG-USER';
+    out('👤 profile:', prof);
+  }catch(e){
+    out('initLiff error:', String(e));
+  }
+}
+async function getProfile(){
+  try{
+    if (!inited) await initLiff();
+    const prof = await liff.getProfile();
+    userId = prof.userId || userId || 'DEBUG-USER';
+    out('👤 profile:', prof);
+  }catch(e){ out('getProfile error:', e); }
 }
 
-async function apply(){
-  const payload = {
-    domain: val('domain'),
-    request_type: val('request_type'),
-    requester_name: val('name') || 'LIFF User',
-    requester_line_user_id: userId,
-    requester_contact: 'liff',
-    region: val('region'),
-    loan_amount: Number(val('loan_amount')||0) || '',
-    loan_type: val('loan_type'),
-    land_action: val('land_action'),
-    industry: val('industry'),
-    notes: val('notes')
-  };
-  const res = await fetch(WEB_APP, {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ action:'submitRequest', payload })
-  });
-  log(await res.json());
+/** Backend sanity pings */
+async function pingBackend(){
+  try{
+    out('GET', WEB_APP);
+    const res = await fetch(WEB_APP, { method:'GET' });
+    out('status', res.status, res.statusText);
+    const text = await res.text();
+    out('raw', text);
+    try{ out('json', JSON.parse(text)); }catch{ /* ignore */ }
+  }catch(e){ out('ping error:', e); }
 }
 
-async function check(){
-  const id = prompt('Enter request_id (e.g., REQ-0001):');
-  if (!id) return;
-  const res = await fetch(WEB_APP, {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ action:'findMatches', payload:{ request_id:id } })
-  });
-  log(await res.json());
+/** Submit demo request */
+async function submitDemo(){
+  try{
+    if (!userId) userId = 'DEBUG-USER'; // desktop fallback
+    const payload = {
+      domain: v('domain'),
+      request_type: v('rtype'),
+      requester_name: v('name') || 'LIFF User',
+      requester_line_user_id: userId,
+      requester_contact: 'liff',
+      region: v('region'),
+      loan_amount: Number(v('amt')||0) || '',
+      loan_type: v('ltype'),
+      land_action: v('laction'),
+      industry: v('industry'),
+      notes: v('notes')
+    };
+    out('POST', WEB_APP, payload);
+    const res = await fetch(WEB_APP, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ action:'submitRequest', payload })
+    });
+    out('status', res.status, res.statusText);
+    const text = await res.text();
+    out('raw', text);
+    try{ out('json', JSON.parse(text)); }catch{ /* non-JSON */ }
+  }catch(e){ out('submit error:', e); }
 }
 
-async function track(){
-  const res = await fetch(WEB_APP, {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ action:'getMyItems', payload:{ userId } })
-  });
-  log(await res.json());
+/** Track items */
+async function trackItems(){
+  try{
+    if (!userId) userId = 'DEBUG-USER';
+    out('POST track', WEB_APP, { userId });
+    const res = await fetch(WEB_APP, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ action:'getMyItems', payload:{ userId } })
+    });
+    out('status', res.status, res.statusText);
+    const text = await res.text();
+    out('raw', text);
+    try{ out('json', JSON.parse(text)); }catch{ /* non-JSON */ }
+  }catch(e){ out('track error:', e); }
 }
 
-liffInit();
+/** Wire buttons */
+document.getElementById('btnInit').onclick = initLiff;
+document.getElementById('btnProfile').onclick = getProfile;
+document.getElementById('btnPing').onclick = pingBackend;
+document.getElementById('btnSubmit').onclick = submitDemo;
+document.getElementById('btnTrack').onclick = trackItems;
+
+/** Auto-init in desktop (helps debugging outside LINE) */
+try{ initLiff(); }catch(e){ out('auto init error:', e); }
 </script>
 </body>
 </html>
+
